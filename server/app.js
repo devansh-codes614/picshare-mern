@@ -12,6 +12,7 @@ app.use("/auth",require("./routes/auth"));
 
 app.use('/user', userRoutes);
 app.use('/post', PostRoutes);
+app.use('/posts', require('./routes/post'));
 app.use("/uploads", express.static("uploads"));
 
 mongoose.connect("mongodb+srv://picshareUser:picshareUser1234@cluster0.j9orscg.mongodb.net/picshare_db?retryWrites=true&w=majority") 

@@ -6,7 +6,7 @@ function Dashboard() {
   const navigate = useNavigate();
 
   const loadPosts = async () => {
-    const res = await fetch("http://localhost:5000/post", {
+    const res = await fetch("http://localhost:5000/post/feed", {
       headers: {
         Authorization: localStorage.getItem("token"),
       },
@@ -18,6 +18,16 @@ function Dashboard() {
   const likePost = async (id) => {
     await fetch(`http://localhost:5000/post/like/${id}`, {
       method: "POST",
+      headers: {
+        Authorization: localStorage.getItem("token"),
+      },
+    });
+    loadPosts();
+  };
+
+  const deletePost = async (id) => {
+    await fetch(`http://localhost:5000/post/delete/${id}`, {
+      method: "DELETE",
       headers: {
         Authorization: localStorage.getItem("token"),
       },
@@ -53,9 +63,19 @@ function Dashboard() {
             alt=""
             style={{ width: "100%" }}
           />
+
           <p>{p.caption}</p>
+
           <button onClick={() => likePost(p._id)}>
             ❤️ {p.likes.length}
+          </button>
+
+          {/* 🔥 DELETE BUTTON */}
+          <button
+            onClick={() => deletePost(p._id)}
+            style={{ marginLeft: 10, color: "red" }}
+          >
+            🗑 Delete
           </button>
         </div>
       ))}

@@ -1,103 +1,82 @@
-const express = require('express');
-const Post = require('../models/Post');
-const authCheck = require('../middleware/authCheck');
-const router = express.Router();        
+const express = require("express");
+const Post = require("../models/Post");
+const User = require("../models/User");
+const authCheck = require("../middleware/authCheck");
+const upload = require("../middleware/upload");
 
-// CREATE A NEW POST
-router.post('/create', authCheck, async function (req, res) {
-    const{imageUrl,caption} = req.body;
-     
-    if(!imageUrl){
-        return res.status(400).send({message:'Image URL is required'});
-    }
+const router = express.Router();
 
-    const newPost = new Post({
-        imageUrl: imageUrl,
-        caption: caption,
+// ================= CREATE POST =================
+router.post(
+  "/create",
+  authCheck,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const newPost = new Post({
+        image: req.file.filename,
+        caption: req.body.caption,
         user: req.userId,
-    });
+        likes: [],
+      });
 
-    await newPost.save();
-    res.send({message:'Post created successfully', post:newPost});
-});
-
-// LIKE A POST//UNLIKE A POST
-router.post('/like/:id', authCheck, async function (req, res) {
-    const postId = req.params.id;
-    const userId = req.userId;
-    const post = await Post.findById(postId);
-    if (!post) {
-        return res.status(404).send({ message: 'Post not found' });
+      await newPost.save();
+      res.json(newPost);
+    } catch (err) {
+      res.status(500).json({ message: "Post create failed" });
     }
+  }
+);
 
-    //already liked-unlike
-    if (post.likes.includes(userId)) {
-        post.likes = post.likes.filter(id => id.toString() !== userId);
-        await post.save();
-        return  res.send({ message: 'Post unliked successfully' });
-    }
-    //not liked-like
-    post.likes.push(userId);
-    await post.save();
-    res.send({ message: 'Post liked successfully' });
-});
+// ================= FEED =================
+router.get("/feed", authCheck, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
 
-// ADD COMMENT TO A POST
-router.post('/comment/:id', authCheck, async function (req, res) {
-    const postId = req.params.id;
-    const userId = req.userId;
-    const { text } = req.body;
-    if (!text) {
-        return res.status(400).send({ message: 'Comment text is required' });
-    }   
-    const post = await Post.findById(postId);
-    if (!post) {
-        return res.status(404).send({ message: 'Post not found' });
-    } 
-    const newComment = {
-        user: userId,
-        text: text
-    };
-    post.comments.push(newComment);
-    await post.save();
-    res.send({ message: 'Comment added successfully' });
-});
-
-//GET FEED POSTS
-router.get('/feed', authCheck, async function (req, res) {
-    const userId = req.userId;
-    
-    const currentUser = await require('../models/User').findById(userId);
-    if (!currentUser) {
-        return res.status(404).send({ message: 'User not found' });
-    }
-    const feedPosts = await Post.find({
-        user: { $in: currentUser.following }
+    const posts = await Post.find({
+      user: { $in: user.following.concat(req.userId) },
     })
-    .sort({ createdAt: -1 })
-    .populate('user', 'username')
-    .populate('comments.user', 'username');
+      .sort({ createdAt: -1 })
+      .populate("user", "username");
 
-    res.send( feedPosts );
+    res.json(posts);
+  } catch (err) {
+    res.status(500).json({ message: "Feed error" });
+  }
 });
 
-//GET FEED POSTS
+// ================= LIKE / UNLIKE =================
+router.post("/like/:id", authCheck, async (req, res) => {
+  const post = await Post.findById(req.params.id);
 
-router.get('/feed', authCheck, async function (req, res) {
-    const userId = req.userId;
+  if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const User = require('../models/User');
-    const currentUser = await User.findById(userId);   
-    if (!currentUser) {
-        return res.status(404).send({ message: 'User not found' });
-    }
-    const feedPosts = await Post.find({
-        user: { $in: currentUser.following }
-    })
-    .sort({ createdAt: -1 })
-    .populate('user', 'username')
-    .populate('comments.user', 'username'); 
-    res.send( feedPosts );
+  if (post.likes.includes(req.userId)) {
+    post.likes.pull(req.userId);
+  } else {
+    post.likes.push(req.userId);
+  }
+
+  await post.save();
+  res.json(post);
 });
 
+// ================= DELETE POST =================
+router.delete("/delete/:id", authCheck, async (req, res) => {
+  const post = await Post.findById(req.params.id);
+
+  if (!post) {
+    return res.status(404).json({ message: "Post not found" });
+  }
+
+  // only owner can delete
+  if (post.user.toString() !== req.userId) {
+    return res.status(403).json({ message: "Not allowed" });
+  }
+
+  await Post.findByIdAndDelete(req.params.id);
+  res.json({ message: "Post deleted successfully" });
+});
+
+// ✅ VERY IMPORTANT
 module.exports = router;

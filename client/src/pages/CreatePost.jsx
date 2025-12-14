@@ -34,8 +34,8 @@ function CreatePost() {
         value={caption}
         onChange={(e) => setCaption(e.target.value)}
       />
-
       <br /><br />
+
       <button onClick={submitPost}>Post</button>
     </div>
   );
